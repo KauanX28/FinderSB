@@ -5,7 +5,7 @@ local Players         = game:GetService("Players")
 -- ══════ Parâmetros fixos ══════
 local PLACE_ID      = game.PlaceId
 local INITIAL_DELAY = 5     -- segundos para as GUIs carregarem
-local IGNORE_RADIUS = 50    -- DISTÂNCIA (em studs) para ignorar brainrots próximos de você
+local IGNORE_RADIUS = 35    -- DISTÂNCIA (em studs) para ignorar brainrots próximos de você
 
 -- Espera LocalPlayer e Character
 local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
