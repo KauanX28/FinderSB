@@ -1,64 +1,156 @@
-local A=game:GetService("RunService")
-local B=workspace
-if not game:IsLoaded() then game.Loaded:Wait() end;A.Heartbeat:Wait()
-local C={}
-local function D(q)
-    local t={},s={}
-    for _,g in ipairs(B:GetDescendants())do
-        if g:IsA("BillboardGui")then
-            for _,l in ipairs(g:GetDescendants())do
-                if l:IsA("TextLabel") and l.Text:lower():find(q:lower())then
-                    local m=g:FindFirstAncestorOfClass("Model")
-                    if m and not s[m]then s[m]=true;table.insert(t,m)end
-                    break
-                end
-            end
+do
+    -- Serviços
+    local TeleportService = game:GetService("TeleportService")
+    local Players         = game:GetService("Players")
+
+    -- Função auxiliar: converte "2.5M", "400K", etc. em número
+    local function parseMoney(str)
+        local s   = tostring(str):lower():gsub("[%$,/]","")
+        local num = tonumber(s:match("%d+%.?%d*")) or 0
+        if s:find("k") then
+            return num * 1e3
+        elseif s:find("m") then
+            return num * 1e6
+        else
+            return num
         end
     end
-    return t
-end
-local function E(th)
-    local t={},s={}
-    local function P(x)
-        local u=x:lower():gsub("[%$,/]","")
-        local n=tonumber(u:match("%d+%.?%d*"))or 0
-        return u:find("k")and n*1e3 or u:find("m")and n*1e6 or n
+
+    -- Aguarda LocalPlayer e Character
+    local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+    if not player.Character or not player.Character.Parent then
+        player.CharacterAdded:Wait()
     end
-    for _,g in ipairs(B:GetDescendants())do
-        if g:IsA("BillboardGui")then
-            for _,l in ipairs(g:GetDescendants())do
-                if l:IsA("TextLabel")then
-                    local x=l.Text
-                    if x:match("^%$?%d+%.?%d*[KkMm]?$")then
-                        if P(x)>=th then
-                            local m=g:FindFirstAncestorOfClass("Model")
-                            if m and not s[m]then s[m]=true;table.insert(t,m)end
+
+    -- 1) Busca por texto (nome/raridade)
+    local function findByText(text)
+        text = text:lower()
+        local seen, results = {}, {}
+        for _, gui in ipairs(workspace:GetDescendants()) do
+            if gui:IsA("BillboardGui") then
+                for _, lbl in ipairs(gui:GetDescendants()) do
+                    if lbl:IsA("TextLabel") and lbl.Text:lower():find(text) then
+                        local mdl = gui:FindFirstAncestorOfClass("Model")
+                        if mdl and not seen[mdl] then
+                            seen[mdl] = true
+                            table.insert(results, mdl)
                         end
                         break
                     end
                 end
             end
         end
+        return results
     end
-    return t
-end
-local function F(models)
-    for _,m in ipairs(models)do
-        local p=m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
-        if p then
-            local z=Instance.new("BoxHandleAdornment",p)
-            z.Adornee=p;z.AlwaysOnTop=true;z.ZIndex=10
-            z.Color3=Color3.fromRGB(255,0,0);z.Transparency=0.1
-            z.Size=p.Size+Vector3.new(2,2,2)
+
+    -- 2) Busca por valor ≥ threshold
+    local function findByValue(threshold)
+        local seen, results = {}, {}
+        for _, gui in ipairs(workspace:GetDescendants()) do
+            if gui:IsA("BillboardGui") then
+                for _, lbl in ipairs(gui:GetDescendants()) do
+                    if lbl:IsA("TextLabel") then
+                        local txt = lbl.Text
+                        if txt:match("^%$?%d+%.?%d*[KkMm]?$") then
+                            local val = parseMoney(txt)
+                            if val >= threshold then
+                                local mdl = gui:FindFirstAncestorOfClass("Model")
+                                if mdl and not seen[mdl] then
+                                    seen[mdl] = true
+                                    table.insert(results, mdl)
+                                end
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+        end
+        return results
+    end
+
+    -- 3) Cria ESP (caixa ao redor do PrimaryPart)
+    local function createESP(model)
+        local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        if not part then return end
+        local box = Instance.new("BoxHandleAdornment")
+        box.Adornee      = part
+        box.AlwaysOnTop  = true
+        box.ZIndex       = 10
+        box.Color3       = Color3.fromRGB(255, 0, 0)
+        box.Transparency = 0.1
+        box.Size         = part.Size + Vector3.new(2,2,2)
+        box.Parent       = part
+    end
+
+    -- 4) Cria tracer (linha da cabeça ao modelo)
+    local function createTracer(model)
+        local head = (player.Character or player.CharacterAdded:Wait()):FindFirstChild("Head")
+        if not head then return end
+        local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        if not part then return end
+
+        local att0 = head:FindFirstChild("TracerAttach") or Instance.new("Attachment", head)
+        att0.Name = "TracerAttach"
+        local att1 = part:FindFirstChild("TracerAttach") or Instance.new("Attachment", part)
+        att1.Name = "TracerAttach"
+
+        local beam = Instance.new("Beam", workspace)
+        beam.Attachment0    = att0
+        beam.Attachment1    = att1
+        beam.FaceCamera     = true
+        beam.LightEmission  = 1
+        beam.Width0         = 0.2
+        beam.Width1         = 0.2
+        beam.Color          = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+    end
+
+    -- 5) Teleporta para outro servidor
+    local function hopServer()
+        local ok, err = pcall(function()
+            TeleportService:Teleport(game.PlaceId, player)
+        end)
+        if not ok then
+            warn("Falha ao teleportar:", err)
         end
     end
-end
 
-local list = (MODE=="value") and E( tonumber(QUERY:lower():gsub("[^%d%.]","")) * (QUERY:lower():find("m") and 1e6 or QUERY:lower():find("k") and 1e3 or 1) )
-                       or D(QUERY)
+    -- 6) Botão manual “Trocar Servidor”
+    local function createTeleportButton()
+        local gui = Instance.new("ScreenGui", game.CoreGui)
+        gui.Name = "TPButtonGUI"
+        local btn = Instance.new("TextButton", gui)
+        btn.Size             = UDim2.new(0,160,0,40)
+        btn.Position         = UDim2.new(1,-170,1,-60)
+        btn.BackgroundColor3 = Color3.fromRGB(0,140,255)
+        btn.TextColor3       = Color3.new(1,1,1)
+        btn.Font             = Enum.Font.GothamBold
+        btn.TextSize         = 14
+        btn.Text             = "Trocar Servidor"
+        btn.BorderSizePixel  = 0
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+        btn.MouseButton1Click:Connect(hopServer)
+    end
 
-print(("Encontrados %d modelo(s) por %s = '%s':"):format(#list,MODE,QUERY))
-for _,m in ipairs(list)do
-    print(" •",m.Name)
+    -- ── Fluxo principal ──
+    task.wait(delay)
+    createTeleportButton()
+
+    local results
+    if mode == "value" then
+        results = findByValue(parseMoney(query))
+    else
+        results = findByText(query)
+    end
+
+    if #results > 0 then
+        print(("✅ %d modelo(s) encontrado(s) por %s = '%s'"):format(#results, mode, query))
+        for _, mdl in ipairs(results) do
+            createESP(mdl)
+            createTracer(mdl)
+        end
+    else
+        print(("❌ Nenhum resultado por %s = '%s'. Indo para outro servidor…"):format(mode, query))
+        hopServer()
+    end
 end
-F(list)
