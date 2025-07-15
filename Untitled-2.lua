@@ -12,7 +12,36 @@ if not player.Character or not player.Character.Parent then
     player.CharacterAdded:Wait()
 end
 
--- ══════ Auxiliar: converte "10M","400K" em número
+-- Detecta qual pasta de plot é a sua, pela distância até o seu HumanoidRootPart
+local function detectMyPlot()
+    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local bestDist = math.huge
+    local myPlot
+    local plots = workspace:FindFirstChild("Plots")
+    if plots then
+        for _, p in ipairs(plots:GetChildren()) do
+            local spawn = p:FindFirstChild("Spawn")
+            if spawn and spawn:IsA("BasePart") then
+                local d = (spawn.Position - hrp.Position).Magnitude
+                if d < bestDist then
+                    bestDist = d
+                    myPlot = p
+                end
+            end
+        end
+    end
+    return myPlot
+end
+
+local myPlot = detectMyPlot()
+
+-- ──── Função: ignora tudo dentro do seu plot ────
+local function isOwnBrainrot(model)
+    return myPlot and model:IsDescendantOf(myPlot)
+end
+
+-- ══════ Auxiliar: converte "10M","400K" em número ══════
 local function parseMoney(str)
     local s = tostring(str):lower():gsub("[%$,/]","")
     local num = tonumber(s:match("%d+%.?%d*")) or 0
@@ -21,15 +50,7 @@ local function parseMoney(str)
     else return num end
 end
 
--- ══════ Ignora seus próprios brainrots (Model "Base" em Workspace.Plots)
-local function isOwnBrainrot(model)
-    if model.Name == "Base" and model:IsDescendantOf(workspace:FindFirstChild("Plots")) then
-        return true
-    end
-    return false
-end
-
--- ══════ Busca por nome/raridade (texto)
+-- ══════ Busca por nome/raridade (texto) ══════
 local function findByText(query)
     query = query:lower()
     local seen, results = {}, {}
@@ -50,7 +71,7 @@ local function findByText(query)
     return results
 end
 
--- ══════ Busca por valor ≥ threshold
+-- ══════ Busca por valor ≥ threshold ══════
 local function findByValue(threshold)
     local seen, results = {}, {}
     for _, gui in ipairs(workspace:GetDescendants()) do
@@ -76,7 +97,7 @@ local function findByValue(threshold)
     return results
 end
 
--- ══════ ESP reforçado
+-- ══════ ESP reforçado ══════
 local function createESP(model)
     local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
     if not part then return end
@@ -89,7 +110,7 @@ local function createESP(model)
     box.Size         = part.Size + Vector3.new(2,2,2)
 end
 
--- ══════ Tracer da cabeça ao modelo
+-- ══════ Tracer da cabeça ao modelo ══════
 local function createTracer(model)
     local char = player.Character or player.CharacterAdded:Wait()
     local head = char:FindFirstChild("Head")
@@ -112,7 +133,7 @@ local function createTracer(model)
     beam.Color         = ColorSequence.new(Color3.fromRGB(255,0,0))
 end
 
--- ══════ Teleport para outro servidor
+-- ══════ Teleport para outro servidor ══════
 local function hopServer()
     local ok, err = pcall(function()
         TeleportService:Teleport(PLACE_ID, player)
@@ -120,7 +141,7 @@ local function hopServer()
     if not ok then warn("Falha ao teleportar:", err) end
 end
 
--- ══════ Botão manual “Trocar Servidor”
+-- ══════ Botão manual “Trocar Servidor” ══════
 local function createTeleportButton()
     local gui = Instance.new("ScreenGui", game.CoreGui)
     gui.Name = "TPButtonGUI"
@@ -141,19 +162,19 @@ end
 task.wait(INITIAL_DELAY)
 createTeleportButton()
 
--- obtém modelos conforme modo
+-- encontra todos os modelos que batem com a busca
 local models = (SEARCH_MODE == "value")
     and findByValue(parseMoney(SEARCH_QUERY))
     or findByText(SEARCH_QUERY)
 
--- remove os seus próprios brainrots
+-- remove só os do seu plot
 for i = #models,1,-1 do
     if isOwnBrainrot(models[i]) then
         table.remove(models, i)
     end
 end
 
--- se achou, marca; senão, salta de servidor
+-- se sobrou algo, marca; senão, troca de servidor
 if #models > 0 then
     print(("✅ %d find(s) por %s='%s'"):format(#models, SEARCH_MODE, SEARCH_QUERY))
     for _, mdl in ipairs(models) do
