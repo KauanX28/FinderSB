@@ -3,10 +3,16 @@ local TeleportService = game:GetService("TeleportService")
 local Players         = game:GetService("Players")
 
 -- ══════ Parâmetros fixos ══════
-local PLACE_ID      = game.PlaceId
-local INITIAL_DELAY = 5           -- segundos para as GUIs carregarem
+local PLACE_ID       = game.PlaceId
+local INITIAL_DELAY  = 5     -- segundos para as GUIs carregarem
+local IGNORE_RADIUS  = 30    -- stud de distância mínima para identificar (ajuste como quiser)
 
--- ══════ Função auxiliar: converte "$2.5M", "400K", "10m" em número ══════
+-- Aguarda LocalPlayer e Character
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+repeat task.wait() until player.Character and player.Character.Parent
+local hrp = player.Character:WaitForChild("HumanoidRootPart", 5)
+
+-- ══════ Auxiliar: converte "$2.5M", "400K", "10m" em número ══════
 local function parseMoney(str)
     local s = tostring(str):lower():gsub("[%$,/]","")
     local num = tonumber(s:match("%d+%.?%d*")) or 0
@@ -17,12 +23,6 @@ local function parseMoney(str)
     else
         return num
     end
-end
-
--- ══════ Aguarda LocalPlayer e Character ══════
-local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
-if not player.Character or not player.Character.Parent then
-    player.CharacterAdded:Wait()
 end
 
 -- ══════ 1) Busca por nome ou raridade (texto exato ou parcial) ══════
@@ -63,8 +63,8 @@ local function findByValue(threshold)
                                 table.insert(results, mdl)
                             end
                         end
-                        break
                     end
+                    break
                 end
             end
         end
@@ -72,24 +72,23 @@ local function findByValue(threshold)
     return results
 end
 
--- ══════ 3) ESP reforçado ══════
+-- ══════ ESP reforçado ══════
 local function createESP(model)
     local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
     if not part then return end
-    local box = Instance.new("BoxHandleAdornment")
+    local box = Instance.new("BoxHandleAdornment", part)
     box.Adornee      = part
     box.AlwaysOnTop  = true
     box.ZIndex       = 10
     box.Color3       = Color3.fromRGB(255,  0,  0)
     box.Transparency = 0.1
     box.Size         = part.Size + Vector3.new(2,2,2)
-    box.Parent       = part
 end
 
--- ══════ 4) Tracer (linha) da cabeça ao modelo ══════
+-- ══════ Tracer (linha) da cabeça ao modelo ══════
 local function createTracer(model)
-    local char = player.Character or player.CharacterAdded:Wait()
-    local head = char:FindFirstChild("Head")
+    local char = player.Character
+    local head = char and char:FindFirstChild("Head")
     if not head then return end
     local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
     if not part then return end
@@ -109,7 +108,7 @@ local function createTracer(model)
     beam.Color          = ColorSequence.new(Color3.fromRGB(255, 0, 0))
 end
 
--- ══════ 5) Teleport para servidor aleatório ══════
+-- ══════ Teleport para servidor aleatório ══════
 local function hopServer()
     local ok, err = pcall(function()
         TeleportService:Teleport(PLACE_ID, player)
@@ -117,7 +116,7 @@ local function hopServer()
     if not ok then warn("Falha ao teleportar:", err) end
 end
 
--- ══════ 6) Botão manual “Trocar Servidor” ══════
+-- ══════ Botão manual “Trocar Servidor” ══════
 local function createTeleportButton()
     local gui = Instance.new("ScreenGui", game.CoreGui)
     gui.Name = "TPButtonGUI"
@@ -138,18 +137,31 @@ end
 task.wait(INITIAL_DELAY)
 createTeleportButton()
 
--- **AQUI** usamos as variáveis **SEARCH_MODE** e **SEARCH_QUERY** injetadas pelo loader:
+-- Carrega resultados conforme modo
 local models = (SEARCH_MODE == "value")
     and findByValue(parseMoney(SEARCH_QUERY))
     or findByText(SEARCH_QUERY)
 
+-- Filtra: ignora os muito próximos de você
+if hrp then
+    for i = #models, 1, -1 do
+        local mdl = models[i]
+        local part = mdl.PrimaryPart or mdl:FindFirstChildWhichIsA("BasePart")
+        if part and (part.Position - hrp.Position).Magnitude <= IGNORE_RADIUS then
+            table.remove(models, i)
+        end
+    end
+end
+
+-- Executa ESP/tracer ou troca de servidor
 if #models > 0 then
-    print(("✅ %d modelo(s) encontrado(s) por %s ≥ '%s'"):format(#models, SEARCH_MODE, SEARCH_QUERY))
+    print(("✅ %d encontrados por %s='%s'"):format(#models, SEARCH_MODE, SEARCH_QUERY))
     for _, mdl in ipairs(models) do
         createESP(mdl)
         createTracer(mdl)
     end
 else
-    print(("❌ Nenhum resultado por %s = '%s'. Indo para outro servidor…"):format(SEARCH_MODE, SEARCH_QUERY))
+    print(("❌ Nenhum resultado válido por %s='%s'. Indo para outro servidor…")
+        :format(SEARCH_MODE, SEARCH_QUERY))
     hopServer()
 end
