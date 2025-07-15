@@ -1,155 +1,95 @@
--- Serviços
-local TeleportService = game:GetService("TeleportService")
-local Players         = game:GetService("Players")
-
--- ══════ Parâmetros fixos ══════
-local PLACE_ID      = game.PlaceId
-local INITIAL_DELAY = 5           -- segundos para as GUIs carregarem
-
--- ══════ Função auxiliar: converte "$2.5M", "400K", "10m" em número ══════
-local function parseMoney(str)
-    local s = tostring(str):lower():gsub("[%$,/]","")
-    local num = tonumber(s:match("%d+%.?%d*")) or 0
-    if s:find("k") then
-        return num * 1e3
-    elseif s:find("m") then
-        return num * 1e6
-    else
-        return num
-    end
+local a=game:GetService("TeleportService")
+local b=game:GetService("Players")
+local c,d=game.PlaceId,5
+local function e(f)
+  local g=tonumber((tostring(f):lower():gsub("[%$,/]",""):match("%d+%.?%d*")))or 0
+  local h=tostring(f):lower()
+  if h:find("k")then return g*1e3
+  elseif h:find("m")then return g*1e6 end
+  return g
 end
-
--- ══════ Aguarda LocalPlayer e Character ══════
-local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
-if not player.Character or not player.Character.Parent then
-    player.CharacterAdded:Wait()
-end
-
--- ══════ 1) Busca por nome ou raridade (texto exato ou parcial) ══════
-local function findByText(query)
-    query = query:lower()
-    local seen, results = {}, {}
-    for _, gui in ipairs(workspace:GetDescendants()) do
-        if gui:IsA("BillboardGui") then
-            for _, lbl in ipairs(gui:GetDescendants()) do
-                if lbl:IsA("TextLabel") and lbl.Text:lower():find(query) then
-                    local mdl = gui:FindFirstAncestorOfClass("Model")
-                    if mdl and not seen[mdl] then
-                        seen[mdl] = true
-                        table.insert(results, mdl)
-                    end
-                    break
-                end
-            end
+local i=b.LocalPlayer or b.PlayerAdded:Wait()
+if not i.Character or not i.Character.Parent then i.CharacterAdded:Wait() end
+local function j(k)
+  local l,m={},{}
+  k=k:lower()
+  for _,n in ipairs(workspace:GetDescendants())do
+    if n:IsA("BillboardGui")then
+      for _,o in ipairs(n:GetDescendants())do
+        if o:IsA("TextLabel")and o.Text:lower():find(k)then
+          local p=n:FindFirstAncestorOfClass("Model")
+          if p and not l[p]then l[p]=true; m[#m+1]=p end
+          break
         end
+      end
     end
-    return results
+  end
+  return m
 end
-
--- ══════ 2) Busca por valor ≥ threshold ══════
-local function findByValue(threshold)
-    local seen, results = {}, {}
-    for _, gui in ipairs(workspace:GetDescendants()) do
-        if gui:IsA("BillboardGui") then
-            for _, lbl in ipairs(gui:GetDescendants()) do
-                if lbl:IsA("TextLabel") then
-                    local txt = lbl.Text
-                    if txt:match("^%$?%d+%.?%d*[KkMm]?$") then
-                        local val = parseMoney(txt)
-                        if val >= threshold then
-                            local mdl = gui:FindFirstAncestorOfClass("Model")
-                            if mdl and not seen[mdl] then
-                                seen[mdl] = true
-                                table.insert(results, mdl)
-                            end
-                        end
-                        break
-                    end
-                end
-            end
+local function q(r)
+  local l,m={},{}
+  for _,n in ipairs(workspace:GetDescendants())do
+    if n:IsA("BillboardGui")then
+      for _,o in ipairs(n:GetDescendants())do
+        if o:IsA("TextLabel")then
+          local s=o.Text
+          if s:match("^%$?%d+%.?%d*[KkMm]?$")and e(s)>=r then
+            local p=n:FindFirstAncestorOfClass("Model")
+            if p and not l[p]then l[p]=true; m[#m+1]=p end
+          end
         end
+        break
+      end
     end
-    return results
+  end
+  return m
 end
-
--- ══════ 3) ESP reforçado ══════
-local function createESP(model)
-    local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-    if not part then return end
-    local box = Instance.new("BoxHandleAdornment")
-    box.Adornee      = part
-    box.AlwaysOnTop  = true
-    box.ZIndex       = 10
-    box.Color3       = Color3.fromRGB(255,  0,  0)
-    box.Transparency = 0.1
-    box.Size         = part.Size + Vector3.new(2,2,2)
-    box.Parent       = part
+local function t(u)
+  local v=u.PrimaryPart or u:FindFirstChildWhichIsA("BasePart")
+  if not v then return end
+  local w=Instance.new("BoxHandleAdornment",v)
+  w.Adornee=v; w.AlwaysOnTop=true; w.ZIndex=10; w.Transparency=0.1
+  w.Size=v.Size+Vector3.new(2,2,2); w.Color3=Color3.fromRGB(255,0,0)
 end
-
--- ══════ 4) Tracer (linha) da cabeça ao modelo ══════
-local function createTracer(model)
-    local char = player.Character or player.CharacterAdded:Wait()
-    local head = char:FindFirstChild("Head")
-    if not head then return end
-    local part = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-    if not part then return end
-
-    local att0 = head:FindFirstChild("TracerAttach") or Instance.new("Attachment", head)
-    att0.Name = "TracerAttach"
-    local att1 = part:FindFirstChild("TracerAttach") or Instance.new("Attachment", part)
-    att1.Name = "TracerAttach"
-
-    local beam = Instance.new("Beam", workspace)
-    beam.Attachment0    = att0
-    beam.Attachment1    = att1
-    beam.FaceCamera     = true
-    beam.LightEmission  = 1
-    beam.Width0         = 0.2
-    beam.Width1         = 0.2
-    beam.Color          = ColorSequence.new(Color3.fromRGB(255, 0, 0))
+local function x(u)
+  local y=i.Character or i.CharacterAdded:Wait()
+  local z=y:FindFirstChild("Head")
+  if not z then return end
+  local v=u.PrimaryPart or u:FindFirstChildWhichIsA("BasePart")
+  if not v then return end
+  local A=z:FindFirstChild("TracerAttach")or Instance.new("Attachment",z)
+  A.Name="TracerAttach"
+  local B=v:FindFirstChild("TracerAttach")or Instance.new("Attachment",v)
+  B.Name="TracerAttach"
+  local C=Instance.new("Beam",workspace)
+  C.Attachment0=A; C.Attachment1=B; C.FaceCamera=true; C.LightEmission=1
+  C.Width0=0.2; C.Width1=0.2
+  C.Color=ColorSequence.new(Color3.fromRGB(255,0,0))
 end
-
--- ══════ 5) Teleport para servidor aleatório ══════
-local function hopServer()
-    local ok, err = pcall(function()
-        TeleportService:Teleport(PLACE_ID, player)
-    end)
-    if not ok then warn("Falha ao teleportar:", err) end
+local function D()
+  local ok,err=pcall(function() a:Teleport(c,i) end)
+  if not ok then warn(err) end
 end
-
--- ══════ 6) Botão manual “Trocar Servidor” ══════
-local function createTeleportButton()
-    local gui = Instance.new("ScreenGui", game.CoreGui)
-    gui.Name = "TPButtonGUI"
-    local btn = Instance.new("TextButton", gui)
-    btn.Size             = UDim2.new(0,160,0,40)
-    btn.Position         = UDim2.new(1,-170,1,-60)
-    btn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-    btn.TextColor3       = Color3.new(1,1,1)
-    btn.Font             = Enum.Font.GothamBold
-    btn.TextSize         = 14
-    btn.Text             = "Trocar Servidor"
-    btn.BorderSizePixel  = 0
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-    btn.MouseButton1Click:Connect(hopServer)
+local function G()
+  local H=Instance.new("ScreenGui",game.CoreGui)
+  H.Name="TP_GUI"
+  local I=Instance.new("TextButton",H)
+  I.Size=UDim2.new(0,160,0,40)
+  I.Position=UDim2.new(1,-170,1,-60)
+  I.BackgroundColor3=Color3.fromRGB(0,140,255)
+  I.Text="Trocar Servidor"
+  I.TextColor3=Color3.new(1,1,1)
+  I.Font=Enum.Font.GothamBold
+  I.TextSize=14
+  I.BorderSizePixel=0
+  Instance.new("UICorner",I).CornerRadius=UDim.new(0,8)
+  I.MouseButton1Click:Connect(D)
 end
-
--- ══════ Fluxo principal ══════
-task.wait(INITIAL_DELAY)
-createTeleportButton()
-
--- **AQUI** usamos as variáveis **SEARCH_MODE** e **SEARCH_QUERY** injetadas pelo loader:
-local models = (SEARCH_MODE == "value")
-    and findByValue(parseMoney(SEARCH_QUERY))
-    or findByText(SEARCH_QUERY)
-
-if #models > 0 then
-    print(("✅ %d modelo(s) encontrado(s) por %s ≥ '%s'"):format(#models, SEARCH_MODE, SEARCH_QUERY))
-    for _, mdl in ipairs(models) do
-        createESP(mdl)
-        createTracer(mdl)
-    end
+task.wait(d)
+G()
+local J=(SEARCH_MODE=="value" and q(e(SEARCH_QUERY)) or j(SEARCH_QUERY))
+if #J>0 then
+  for _,u in ipairs(J)do t(u); x(u) end
 else
-    print(("❌ Nenhum resultado por %s = '%s'. Indo para outro servidor…"):format(SEARCH_MODE, SEARCH_QUERY))
-    hopServer()
+  D()
 end
